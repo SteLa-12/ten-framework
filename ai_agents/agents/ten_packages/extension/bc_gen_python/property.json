@@ -1,0 +1,6 @@
+{
+    "device": "cpu",
+    "threshold": 0.25,
+    "audio_file_path": "uhm.wav",
+    "holdback": 5
+}

@@ -1,0 +1,92 @@
+{
+  "type": "extension",
+  "name": "bc_gen_python",
+  "version": "0.11.34",
+  "display_name": {
+    "locales": {
+      "en-US": {
+        "content": "Backchannel generation extension"
+      }
+    }
+  },
+  "description": {
+    "locales": {
+      "en-US": {
+        "content": "An extension that generates backchannel audio responses using the Maai BC model."
+      }
+    }
+  },
+  "readme": {
+    "locales": {
+      "en-US": {
+        "import_uri": "docs/README.en-US.md"
+      }
+    }
+  },
+  "tags": [
+    "python",
+    "template"
+  ],
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11.34"
+    }
+  ],
+  "package": {
+    "include": [
+      "manifest.json",
+      "property.json",
+      "tests/**.py",
+      "tests/bin/*",
+      "requirements.txt",
+      "docs/**",
+      ".vscode/**"
+    ]
+  },
+  "api": {
+    "property": {
+      "properties": {
+        "device": {
+          "type": "string"
+        },
+        "threshold": {
+          "type": "float32"
+        },
+        "holdback": {
+          "type": "int64"
+        },
+        "voice": {
+          "type": "string"
+        }
+      }
+    },
+    "audio_frame_in": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "cmd_in": [
+      {
+        "name": "start_of_sentence"
+      },
+      {
+        "name": "end_of_sentence"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "text_data"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "tests/bin/start"
+  }
+}
