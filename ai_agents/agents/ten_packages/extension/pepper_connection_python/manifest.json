@@ -1,0 +1,75 @@
+{
+  "type": "extension",
+  "name": "pepper_connection_python",
+  "version": "0.11.53",
+  "display_name": {
+    "locales": {
+      "en-US": {
+        "content": "Pepper Connection Python Extension"
+      }
+    }
+  },
+  "description": {
+    "locales": {
+      "en-US": {
+        "content": "Pepper connection extension for Python"
+      }
+    }
+  },
+  "readme": {
+    "locales": {
+      "en-US": {
+        "import_uri": "docs/README.en-US.md"
+      }
+    }
+  },
+  "tags": [
+    "python",
+    "template"
+  ],
+  "dependencies": [
+    {
+      "type": "system",
+      "name": "ten_runtime_python",
+      "version": "0.11.53"
+    }
+  ],
+  "package": {
+    "include": [
+      "manifest.json",
+      "property.json",
+      "pyproject.toml",
+      "tests/**.py",
+      "tests/pyproject.toml",
+      "tests/bin/*",
+      "requirements.txt",
+      "docs/**",
+      ".vscode/**"
+    ]
+  },
+  "api": {
+    "property": {
+      "properties": {
+        "ipaddress": {
+          "type": "string"
+        },
+        "port": {
+          "type": "int64"
+        }
+      }
+    },
+    "audio_frame_in": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
+    "cmd_in": [
+      {
+        "name": "end_of_sentence"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "tests/bin/start"
+  }
+}

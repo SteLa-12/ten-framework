@@ -4,7 +4,6 @@ ARG USE_AGENT=agents/pepper-voice-assistant
 
 WORKDIR /app
 
-COPY .env.example .env
 COPY server/ server/
 COPY agents/scripts/ agents/scripts/
 COPY agents/ten_packages/ agents/ten_packages/
