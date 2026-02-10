@@ -1,1 +1,7 @@
-{}
+{
+    "pepper_ip_address": "192.168.0.127",
+    "host_ip_address": "127.0.0.1",
+    "pepper_port": 9559,
+    "host_port": 5001,
+    "face_size": 0.1
+}

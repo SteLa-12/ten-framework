@@ -26,7 +26,7 @@ if __name__ == "__main__":
     time.sleep(5)  # Wait for the Pepper runner to initialize and be ready to accept connections
 
     # Create a PepperClient instance to communicate with the Pepper runner
-    client = PepperClient(pepper_ip=pepper_ip)
+    client = PepperClient(pepper_ip_address=pepper_ip)
     # Example: Send a command to Pepper and wait for the response
     client.send_message("_stop_listening")
 

@@ -6,26 +6,24 @@ import time
 import librosa
 
 class PepperClient:
-    def __init__(self, port: int = 5001, pepper_ip: str = "192.168.0.102", host_ip: str = "127.0.0.1"):
+    def __init__(self, host_port: int = 5001, pepper_ip_address: str = "192.168.0.102", host_ip_address: str = "127.0.0.1"):
         """
         Initialize the PepperClient with the given port and Pepper IP address.
 
         Args:
-            port (int): The port number for the socket connection. Default is 5001.
-            pepper_ip (str): The IP address of the Pepper robot. Default is "192.168.0.102".
-            host_ip (str): The IP address of the host machine. Default is "127.0.0.1".
+            host_port (int): The port number for the socket connection. Default is 5001.
+            pepper_ip_address (str): The IP address of the Pepper robot. Default is "192.168.0.102".
+            host_ip_address (str): The IP address of the host machine. Default is "127.0.0.1".
         """
 
-        self.pepper_ip = pepper_ip
+        self.pepper_ip = pepper_ip_address
 
         try:
-            host = host_ip
             self.server_socket = socket.socket()
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind((host, port))
+            self.server_socket.bind((host_ip_address, host_port))
             self.server_socket.listen(1)  # Enable server to accept connections
-            print(f"PepperClient initialized. Listening on {host}:{port} for Pepper connection...")
-            logging.info(f"Listening on {host}:{port}")
+            logging.info(f"Listening on {host_ip_address}:{host_port}")
 
             # Blocking call - wait for Pepper to connect
             logging.info("Waiting for Pepper to connect...")

@@ -50,11 +50,20 @@
   "api": {
     "property": {
       "properties": {
-        "ipaddress": {
+        "pepper_ip_address": {
           "type": "string"
         },
-        "port": {
+        "host_ip_address": {
+          "type": "string"
+        },
+        "pepper_port": {
           "type": "int64"
+        },
+        "host_port": {
+          "type": "int64"
+        },
+        "face_size": {
+          "type": "number"
         }
       }
     },
@@ -66,6 +75,9 @@
     "cmd_in": [
       {
         "name": "end_of_sentence"
+      },
+      {
+        "name": "start_of_sentence"
       }
     ]
   },

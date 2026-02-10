@@ -4,6 +4,8 @@ Pepper Robot Runner
 Local runner for the Pepper robot. This module interacts with the main functionalities of the Pepper robot, such as speech, motion, and tablet display. It establishes a socket connection to receive commands and data from an external source (e.g., a server or another application) and processes them accordingly.
 """
 
+from ipaddress import ip_address
+from ipaddress import ip_address
 import socket
 import qi
 import sys
@@ -164,13 +166,13 @@ class PepperRunner(object):
         logging.info("[PEPPER] Exiting message processing loop.")
 
 
-def init_pepper(ip_address: str, port_number: int = 9559, face_size: float = 0.1, host_ip: str = "127.0.0.1", host_port_number: int = 5001):
+def init_pepper(pepper_ip_address: str, pepper_port_number: int = 9559, face_size: float = 0.1, host_ip: str = "127.0.0.1", host_port_number: int = 5001):
     """
     Initialize the Pepper robot connection and start the local runner for command processing and data sending.
 
     Args:
-        ip_address (str): The IP address of the Pepper robot.
-        port_number (int): The port number for the socket connection. Default is 9559.
+        pepper_ip_address (str): The IP address of the Pepper robot.
+        pepper_port_number (int): The port number for the socket connection. Default is 9559.
         face_size (float): The size of the face to track (default is 0.1).
         host_ip (str): The IP address of the host machine. Default is "127.0.0.1".
         host_port_number (int): The port number for the host machine's socket connection. Default is 5001.
@@ -178,11 +180,11 @@ def init_pepper(ip_address: str, port_number: int = 9559, face_size: float = 0.1
 
     try:
         # Initialize qi framework.
-        connection_url = "tcp://" + ip_address + ":" + str(port_number)
+        connection_url = "tcp://" + pepper_ip_address + ":" + str(pepper_port_number)
         app = qi.Application(["PepperRunner", "--qi-url=" + connection_url])
-        print("Connected to Naoqi at ip \"" + ip_address + "\" on port " + str(port_number) + ".")
+        print("Connected to Naoqi at ip \"" + pepper_ip_address + "\" on port " + str(pepper_port_number) + ".")
     except RuntimeError:
-        print("Can't connect to Naoqi at ip \"" + ip_address + "\" on port " + str(port_number) + ".\n")
+        print("Can't connect to Naoqi at ip \"" + pepper_ip_address + "\" on port " + str(pepper_port_number) + ".\n")
         sys.exit(1)
 
     MySoundProcessingModule = PepperRunner(app, face_size, host_ip, host_port_number)
