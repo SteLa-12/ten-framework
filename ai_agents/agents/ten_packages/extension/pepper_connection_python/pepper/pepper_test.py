@@ -4,6 +4,7 @@ Test file for the pepper connection extension.
 
 
 # Example usage of the PepperClient
+import sys
 from pepper_client import PepperClient
 from pepper_runner import init_pepper
 
@@ -31,6 +32,14 @@ if __name__ == "__main__":
 
     time.sleep(2)  # Wait for a moment before sending the next command
 
+    client.copy_path_to_pepper(0)
+    response = client.send_message("_sending0")
+    client.audio_time_silence("pepper_response.mp3")
+    if response == "reproducing":
+        print("Pepper is reproducing the audio file.")
+    else:
+        print(f"Unexpected response from Pepper: {response}")
+
     response = client.send_and_wait_for_response("_end_sequence")
     print(f"Response from Pepper: {response}")
 
@@ -44,4 +53,10 @@ if __name__ == "__main__":
 
     runner_thread.join()  # Wait for the Pepper runner thread to finish
 
+    print("Pepper runner thread has finished. Exiting test.")
+
     client.close_socket()  # Ensure the client socket is closed after the test
+
+    print("Client socket closed. Exiting program.")
+
+    sys.exit(0)

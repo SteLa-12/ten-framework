@@ -60,7 +60,7 @@ class PepperRunner(object):
         self.tracker_service.registerTarget("Face", faceSize)
         self.tracker_service.setMode("Head")
         self.tracker_service.track("Face")
-        self.audio_device.setOutputVolume(100)
+        self.audio_device.setOutputVolume(20) # TODO: Set back to 100 after testing
 
         self._is_listening = False
 
@@ -161,6 +161,8 @@ class PepperRunner(object):
                 logging.error("[PEPPER] Error in message processing loop: " + str(e))
                 break
 
+        logging.info("[PEPPER] Exiting message processing loop.")
+
 
 def init_pepper(ip_address: str, port_number: int = 9559, face_size: float = 0.1, host_ip: str = "127.0.0.1", host_port_number: int = 5001):
     """
@@ -186,3 +188,4 @@ def init_pepper(ip_address: str, port_number: int = 9559, face_size: float = 0.1
     MySoundProcessingModule = PepperRunner(app, face_size, host_ip, host_port_number)
     app.session.registerService("PepperRunner", MySoundProcessingModule)
     MySoundProcessingModule.startProcessing()
+    app.stop()
