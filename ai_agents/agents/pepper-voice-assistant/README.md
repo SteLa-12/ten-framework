@@ -190,13 +190,13 @@ Access the visual designer at http://localhost:49483 to customize your voice age
 
 ```bash
 cd ai_agents
-docker build -f agents/pepper-voice-assistant/Dockerfile -t voice-assistant-app .
+docker build -f agents/pepper-voice-assistant/Dockerfile -t pepper-voice-assistant-app .
 ```
 
 ### Run
 
 ```bash
-docker run --rm -it --env-file .env -p 8080:8080 -p 3000:3000 voice-assistant-app
+docker run --rm -it --env-file .env -p 8080:8080 -p 3000:3000 pepper-voice-assistant-app
 ```
 
 ### Access
