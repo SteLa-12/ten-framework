@@ -16,11 +16,12 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 
-    pepper_ip = "192.168.0.127"  # Replace with your Pepper robot's IP address
+    pepper_ip = "127.0.0.1"  # Replace with your Pepper robot's IP address
+    pepper_port_number = 61198  # Default port for Pepper's Naoqi framework
 
     # Start the Pepper runner in a separate thread or process
 
-    runner_thread = threading.Thread(target=init_pepper, args=(pepper_ip,))
+    runner_thread = threading.Thread(target=init_pepper, args=(pepper_ip,pepper_port_number))
     runner_thread.start()
 
     time.sleep(5)  # Wait for the Pepper runner to initialize and be ready to accept connections

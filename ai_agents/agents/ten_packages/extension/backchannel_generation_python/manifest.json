@@ -1,18 +1,18 @@
 {
   "type": "extension",
-  "name": "pepper_connection_python",
+  "name": "backchannel_generation_python",
   "version": "0.11.53",
   "display_name": {
     "locales": {
       "en-US": {
-        "content": "Pepper Connection Python Extension"
+        "content": "Rule-based backchannel generation module"
       }
     }
   },
   "description": {
     "locales": {
       "en-US": {
-        "content": "Pepper connection extension for Python"
+        "content": "Using simple heuristics based on pitch and silence detection, this module generates backchannel signals in real-time during conversations. It can be used as a template for building more complex backchannel generation systems or for educational purposes to understand the basics of audio processing for conversational agents."
       }
     }
   },
@@ -49,35 +49,29 @@
   },
   "api": {
     "property": {
-      "properties": {
-        "pepper_ip_address": {
-          "type": "string"
-        },
-        "host_ip_address": {
-          "type": "string"
-        },
-        "pepper_port": {
-          "type": "int64"
-        },
-        "host_port": {
-          "type": "int64"
-        },
-        "face_size": {
-          "type": "float32"
-        }
-      }
+      "properties": {}
     },
     "audio_frame_in": [
       {
         "name": "pcm_frame"
       }
     ],
+    "audio_frame_out": [
+      {
+        "name": "pcm_frame"
+      }
+    ],
     "cmd_in": [
       {
-        "name": "end_of_sentence"
+        "name": "start_of_sentence"
       },
       {
-        "name": "start_of_sentence"
+        "name": "end_of_sentence"
+      }
+    ],
+    "data_in": [
+      {
+        "name": "text_data"
       }
     ]
   },

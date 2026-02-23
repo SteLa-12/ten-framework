@@ -77,6 +77,6 @@ COPY --from=builder /app/playground/ /app/playground/
 # Copy Docker Taskfile
 COPY --from=builder /app/${USE_AGENT}/Taskfile.docker.yml /app/Taskfile.docker.yml
 
-EXPOSE 8080 3000
+EXPOSE 8080 4000
 
 ENTRYPOINT ["task", "-t", "Taskfile.docker.yml", "run-prod"]

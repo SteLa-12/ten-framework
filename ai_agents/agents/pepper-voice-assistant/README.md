@@ -217,9 +217,12 @@ docker run --rm -it --env-file .env -p 8080:8080 -p 3000:3000 pepper-voice-assis
 <br>
 MaAI needs PyAudio to be able to run, which runs on portaudio. This specific package needs to be installed separately, which can be done using the following command:
 ```
-sudo apt-get portaudio19-dev
+sudo apt-get install portaudio19-dev
 ```
 If this doesn't work, you should probably first update apt-get, which can be done using this command:
 ```
 sudo apt-get update
 ```
+
+2. **Problems with pydub**
+Install ffmpeg

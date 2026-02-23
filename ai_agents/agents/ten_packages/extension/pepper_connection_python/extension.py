@@ -15,11 +15,12 @@ from ten_runtime import (
     LogLevel,
 )
 
-from pepper.pepper_client import PepperClient
-from pepper.pepper_runner import init_pepper
-from config import PepperConfig
+from .pepper.pepper_client import PepperClient
+from .pepper.pepper_runner import init_pepper
+from .config import PepperConfig
 import threading
 import time
+from pydub import AudioSegment
 
 class Extension(AsyncExtension):
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
@@ -43,6 +44,8 @@ class Extension(AsyncExtension):
 
         self.speaking = False
 
+        self.buffer_length = 100
+
     async def on_start(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_start")
 
@@ -64,6 +67,7 @@ class Extension(AsyncExtension):
 
         if cmd_name == "end_of_sentence":
             self.speaking = False
+            # Send buffer to Pepper for playback and clear buffer
             await self._on_end_of_sequence(ten_env)
 
         if cmd_name == "start_of_sentence":
@@ -90,6 +94,10 @@ class Extension(AsyncExtension):
             audio_frame_buffer = audio_frame.get_buf()
             self.audio_buffer.extend(audio_frame_buffer)
 
+        if len(self.audio_buffer) > self.buffer_length * 16000 * 2:  # Assuming 16kHz sample rate and 16-bit audio (2 bytes per sample)
+            await self._on_end_of_sequence(ten_env)
+            self.audio_buffer.clear()  # Clear the buffer after sending to Pepper
+
     async def on_video_frame(
         self, ten_env: AsyncTenEnv, video_frame: VideoFrame
     ) -> None:
@@ -104,8 +112,15 @@ class Extension(AsyncExtension):
         # IMPLEMENT: process end of sequence event
         # At this point the extension should combine all audio fragments in the buffer and send audio file to Pepper for playback
         audio_file_path = "pepper_response.mp3"
-        with open(audio_file_path, "wb") as audio_file:
-            audio_file.write(self.audio_buffer)
+
+        # Convert raw PCM audio buffer to MP3
+        audio_segment = AudioSegment(
+            data=self.audio_buffer,
+            sample_width=2,  # 16-bit audio = 2 bytes per sample
+            frame_rate=16000,  # 16kHz sample rate
+            channels=1  # Mono audio
+        )
+        audio_segment.export(audio_file_path, format="mp3")
 
         self.pepper_client.copy_path_to_pepper(0, audio_file_path)
         response = self.pepper_client.send_message("_sending0")

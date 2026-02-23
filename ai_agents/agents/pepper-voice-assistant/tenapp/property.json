@@ -88,6 +88,11 @@
               "name": "streamid_adapter",
               "addon": "streamid_adapter",
               "property": {}
+            },
+            {
+              "type": "extension",
+              "name": "backchannel_generation",
+              "addon": "backchannel_generation_python"
             }
           ],
           "connections": [
@@ -156,6 +161,9 @@
                   "dest": [
                     {
                       "extension": "stt"
+                    },
+                    {
+                      "extension": "backchannel_generation"
                     }
                   ]
                 }
@@ -181,6 +189,24 @@
             "type": "console",
             "config": {
               "stream": "stdout"
+            }
+          }
+        },
+        {
+          "matchers": [
+            {
+              "level": "debug"
+            }
+          ],
+          "formatter": {
+            "type": "json",
+            "colored": false
+          },
+          "emitter": {
+            "type": "otlp",
+            "config": {
+              "endpoint": "http://localhost:3100",
+              "service_name": "pepper-voice-assistant"
             }
           }
         }

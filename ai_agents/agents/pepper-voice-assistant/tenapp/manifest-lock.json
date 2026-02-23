@@ -187,6 +187,32 @@
       "path": "../../ten_packages/extension/ten_vad_python"
     },
     {
+      "type": "extension",
+      "name": "pepper_connection_python",
+      "version": "0.11.53",
+      "hash": "1c6322e814776771d474f58aa9e9d06b18e0b6497d20b93b55e6413d93008c28",
+      "dependencies": [
+        {
+          "type": "system",
+          "name": "ten_runtime_python"
+        }
+      ],
+      "path": "../../ten_packages/extension/pepper_connection_python"
+    },
+    {
+      "type": "extension",
+      "name": "backchannel_generation_python",
+      "version": "0.11.53",
+      "hash": "993c0d6cfe5c32bc0730620e85332e83386556d585d7c08808d3755fba097f33",
+      "dependencies": [
+        {
+          "type": "system",
+          "name": "ten_runtime_python"
+        }
+      ],
+      "path": "../../ten_packages/extension/backchannel_generation_python"
+    },
+    {
       "type": "system",
       "name": "ten_runtime_python",
       "version": "0.11.53",
