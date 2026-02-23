@@ -53,7 +53,8 @@ export const DEFAULT_OCEAN_BASE_SETTINGS: IOceanBaseSettings = {
   collection_id: "",
 };
 
-export const DESCRIPTION = "Multi-Purpose Voice Assistant Agent Example Powered by TEN";
+export const DESCRIPTION =
+  "Multi-Purpose Voice Assistant Agent Example Powered by TEN";
 export const LANGUAGE_OPTIONS: LanguageOptionItem[] = [
   {
     label: "English",
@@ -77,6 +78,10 @@ export const GROUPED_GRAPH_OPTIONS = {
     {
       label: "OpenAI GPT 5",
       value: "va_openai_azure",
+    },
+    {
+      label: "Minimax M2.5 highspeed",
+      value: "minimax",
     },
     // {
     //   label: "OpenAI Realtime + Custom STT/TTS",
