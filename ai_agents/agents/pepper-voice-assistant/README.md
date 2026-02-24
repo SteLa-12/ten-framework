@@ -226,3 +226,7 @@ sudo apt-get update
 
 2. **Problems with pydub**
 Install ffmpeg
+
+3. **Problems with invalid logging configuration**
+Make sure to use tman version of at least 0.11.53 to be sure logging using grafana and otlp is supported. You can check your tman version using `tman --version` and update it using `pip install tman --upgrade` (don't know if this works, otherwise download from github release page and install inside /pepper-voice-assistant/ten_manager/bin).
+If it is not updated in the docker container, copy it to the correct path to us tman.

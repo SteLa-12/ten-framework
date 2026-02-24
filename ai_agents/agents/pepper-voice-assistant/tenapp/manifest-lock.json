@@ -69,8 +69,8 @@
     {
       "type": "extension",
       "name": "openai_asr_python",
-      "version": "0.2.2",
-      "hash": "dc0d2ecf5c104c396b0539e7f915041453d007aedebd121740c5bb965fd513dc",
+      "version": "0.3.0",
+      "hash": "56374e250f4ab3d43a9a52ad22bc21317b1183c54467e4625653753ac8615b79",
       "dependencies": [
         {
           "type": "system",
@@ -120,8 +120,8 @@
     {
       "type": "extension",
       "name": "openai_tts2_python",
-      "version": "0.5.1",
-      "hash": "fe3e4473196cbab079a7a6ff99282fec7259e80a57ced948bbc4b27908a3df81",
+      "version": "0.6.1",
+      "hash": "7c51a7d8562285cf6b3a62c6edb7ec06caf64d9ccadf483eb57a4e675e079f81",
       "dependencies": [
         {
           "type": "system",

@@ -1,0 +1,28 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+# --- This is the part that was missing or empty ---
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 1s
+
+exporters:
+  otlphttp/loki:
+    endpoint: "http://loki:3100/otlp"
+    tls:
+      insecure: true
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch] # This now points to the definition above
+      exporters: [otlphttp/loki, debug]

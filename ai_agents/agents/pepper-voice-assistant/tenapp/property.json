@@ -178,17 +178,18 @@
         {
           "matchers": [
             {
-              "level": "info"
+              "level": "warn"
             }
           ],
           "formatter": {
-            "type": "plain",
-            "colored": true
+            "type": "json"
           },
           "emitter": {
-            "type": "console",
+            "type": "otlp",
             "config": {
-              "stream": "stdout"
+              "endpoint": "http://otel-collector:4317",
+              "protocol": "grpc",
+              "service_name": "ten-framework-app"
             }
           }
         },
@@ -199,14 +200,13 @@
             }
           ],
           "formatter": {
-            "type": "json",
-            "colored": false
+            "type": "plain",
+            "colored": true
           },
           "emitter": {
-            "type": "otlp",
+            "type": "console",
             "config": {
-              "endpoint": "http://localhost:3100",
-              "service_name": "pepper-voice-assistant"
+              "stream": "stdout"
             }
           }
         }
