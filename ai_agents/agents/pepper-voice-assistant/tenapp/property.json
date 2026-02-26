@@ -178,7 +178,7 @@
         {
           "matchers": [
             {
-              "level": "warn"
+              "level": "debug"
             }
           ],
           "formatter": {
@@ -196,7 +196,7 @@
         {
           "matchers": [
             {
-              "level": "debug"
+              "level": "warn"
             }
           ],
           "formatter": {

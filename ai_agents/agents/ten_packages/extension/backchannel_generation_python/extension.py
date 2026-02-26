@@ -15,6 +15,7 @@ from ten_runtime import (
     LogLevel,
 )
 from .backchannel_detection import RealtimeBackchanneler
+from .config import BackchannelConfig
 
 
 class Extension(AsyncExtension):
@@ -24,28 +25,16 @@ class Extension(AsyncExtension):
     async def on_start(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_start")
 
-        self.pitch_fall_threshold_hz = 30.0
-        self.last_pitch_hz: float | None = None
-        self.backchannel_predictor = RealtimeBackchanneler(ten_env)
+        config_json, _ = await ten_env.get_property_to_json("")
 
-        try:
-            threshold_result = await ten_env.get_property_float(
-                "pitch_fall_threshold_hz"
-            )
-            if isinstance(threshold_result, tuple):
-                threshold_value, threshold_error = threshold_result
-                if threshold_error is None and threshold_value is not None:
-                    self.pitch_fall_threshold_hz = float(threshold_value)
-            elif threshold_result is not None:
-                self.pitch_fall_threshold_hz = float(threshold_result)
-        except Exception:
-            ten_env.log_warn(
-                "pitch_fall_threshold_hz not found or invalid, using default 30.0Hz"
-            )
+        self.config = BackchannelConfig.model_validate_json(config_json)
 
         ten_env.log_info(
-            f"pitch_fall_threshold_hz={self.pitch_fall_threshold_hz:.2f}"
+            f"pitch_fall_threshold_hz={self.config.pitch_fall_threshold_hz:.2f}"
         )
+
+        self.last_pitch_hz: float | None = None
+        self.backchannel_predictor = RealtimeBackchanneler(ten_env, self.config.frame_rate, self.config.chunk_size, self.config.silence_threshold, self.config.pause_req_ms, self.config.speech_req_ms, self.config.pitch_window_ms, self.config.pitch_shift_hz, self.config.bc_cooldown_ms)
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_stop")
@@ -76,10 +65,6 @@ class Extension(AsyncExtension):
         audio_frame_name = audio_frame.get_name()
         ten_env.log(LogLevel.DEBUG, "on_audio_frame name {}".format(audio_frame_name))
 
-        audio_frame_buffer = audio_frame.get_buf()
-        if not audio_frame_buffer:
-            return
-
         bytes_per_sample = audio_frame.get_bytes_per_sample()
         if bytes_per_sample != 2:
             ten_env.log_debug(
@@ -87,7 +72,7 @@ class Extension(AsyncExtension):
             )
             return
 
-        self.backchannel_predictor.process_frame(audio_frame_buffer)
+        self.backchannel_predictor.process_frame(audio_frame)
 
     async def on_video_frame(
         self, ten_env: AsyncTenEnv, video_frame: VideoFrame

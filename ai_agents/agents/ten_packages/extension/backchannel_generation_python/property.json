@@ -1,3 +1,11 @@
 {
-	"pitch_fall_threshold_hz": 30.0
+	"pitch_fall_threshold_hz": 30.0,
+	"frame_rate": 16000,
+	"chunk_size": 160,
+	"silence_threshold": 0.015,
+	"pause_req_ms": 400,
+	"speech_req_ms": 1000,
+	"pitch_window_ms": 100,
+	"pitch_shift_hz": 30.0,
+	"bc_cooldown_ms": 1400
 }
