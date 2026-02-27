@@ -5,7 +5,10 @@ from collections import deque
 import enum
 
 from ten_runtime.async_ten_env import AsyncTenEnv
-from ten_runtime.audio_frame import AudioFrame
+
+from pathlib import Path
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class BackchannelType(enum.Enum):
     ASSESSMENT = 1
@@ -51,6 +54,17 @@ class RealtimeBackchanneler:
         # Latched states at the moment speech ends
         self.pitch_valid_at_speech_end = False
         self.speech_duration_at_end = 0.0
+
+        # Load backchannel prediction model and tokenizer
+        # Load model and tokenizer from local folder
+        model_dir = Path("ten_packages/extension/backchannel_generation_python/prediction-model")
+        if not model_dir.exists():
+            raise FileNotFoundError(f"Model folder not found: {model_dir.resolve()}")
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(self.device)
+        self.model.eval()
 
     def detect_pitch_variation(self, samples: bytearray) -> bool:
         """
@@ -145,7 +159,7 @@ class RealtimeBackchanneler:
 
         return current_time - self.last_bc_time
 
-    def get_backchannel_class(self) -> BackchannelType:
+    def get_backchannel_class(self, utterance: str) -> tuple[BackchannelType, float]:
         """
         Retrieve type of backchannel based on previous utterance
 
@@ -153,29 +167,33 @@ class RealtimeBackchanneler:
             BackchannelType: Type of backchannel, could be either ASSESSMENT or CONTINUER
         """
 
-    def process_frame(self, audio_frame: AudioFrame):
+        encoding = self.tokenizer(
+            utterance,
+            truncation=True,
+            padding=True,
+            max_length=512,
+            return_tensors="pt",
+        )
+        encoding = {k: v.to(self.device) for k, v in encoding.items()}
 
-        samples = audio_frame.get_buf()
-        if not samples:
-            return
+        with torch.no_grad():
+            logits = self.model(**encoding).logits
+            probs = torch.softmax(logits, dim=-1).squeeze(0)
 
-        bit_depth = audio_frame.get_bytes_per_sample() * 8
-        n_channels = audio_frame.get_number_of_channels()
+        pred_idx = int(torch.argmax(probs).item())
+        id2label = self.model.config.id2label or {}
+        predicted_label = id2label.get(str(pred_idx), id2label.get(pred_idx, f"LABEL_{pred_idx}"))
+        confidence = float(probs[pred_idx].item())
 
-        bits_per_sample = bit_depth // n_channels
+        return BackchannelType(predicted_label), confidence
 
-        sample_map = {8: np.int8, 16: np.int16, 24: np.int32, 32: np.int32}
-
-        samples_np = np.frombuffer(samples, dtype=sample_map[bits_per_sample]).astype(np.float32)
-
-        # Calculate Volume (RMS)
-        rms = float(np.sqrt(np.mean(samples_np ** 2)))
+    def process_frame(self, samples: bytearray) -> None:
 
         pitch_condition_met = self.detect_pitch_variation(samples)
 
         if pitch_condition_met:
 
-            self.ten_env.log_debug(f"Pitch variation detected! Now detecting silence")
+            self.ten_env.log_debug("Pitch variation detected! Now detecting silence")
 
             talking_time = self.get_latest_speech_time(time.time_ns() // 1000)
 
@@ -183,7 +201,7 @@ class RealtimeBackchanneler:
 
             if talking_time >= self.speech_req_ms and time_since_bc >= self.bc_cooldown_ms:
 
-                self.ten_env.log_debug(f"Backchannel opportunity! now waiting 400 ms")
+                self.ten_env.log_debug("Backchannel opportunity! now waiting 400 ms")
 
                 # Currently we are in a different state: backchannel opportunity -> which means that we need to wait 400ms
                 # So we need to wait 400ms after pich fall or rising and then detect whether not in talking stage.

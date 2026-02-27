@@ -142,3 +142,7 @@ ai_agents/.idea
 ai_agents/*.log
 ai_agents/*.pcm
 /.trae
+ai_agents/agents/ten_packages/extension/backchannel_generation_python/prediction-model/config.json
+ai_agents/agents/ten_packages/extension/backchannel_generation_python/prediction-model/model.safetensors
+ai_agents/agents/ten_packages/extension/backchannel_generation_python/prediction-model/tokenizer_config.json
+ai_agents/agents/ten_packages/extension/backchannel_generation_python/prediction-model/tokenizer.json

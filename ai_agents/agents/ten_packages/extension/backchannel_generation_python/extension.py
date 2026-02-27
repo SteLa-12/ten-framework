@@ -80,7 +80,9 @@ class Extension(AsyncExtension):
             )
             return
 
-        self.backchannel_predictor.process_frame(audio_frame)
+        samples = audio_frame.get_buf()
+
+        self.backchannel_predictor.process_frame(samples)
 
     async def on_video_frame(
         self, ten_env: AsyncTenEnv, video_frame: VideoFrame
