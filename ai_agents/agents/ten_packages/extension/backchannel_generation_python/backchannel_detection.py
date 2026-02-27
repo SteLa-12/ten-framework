@@ -2,9 +2,14 @@ import numpy as np
 import aubio
 import time
 from collections import deque
+import enum
 
 from ten_runtime.async_ten_env import AsyncTenEnv
 from ten_runtime.audio_frame import AudioFrame
+
+class BackchannelType(enum.Enum):
+    ASSESSMENT = 1
+    CONTINUER = 2
 
 class RealtimeBackchanneler:
     def __init__(self, ten_env: AsyncTenEnv,
@@ -34,10 +39,10 @@ class RealtimeBackchanneler:
         self.pitch_detector.set_silence(-40)
 
         # State Tracking
-        self.is_speaking = False
-        self.speech_start_time = 0.0
-        self.silence_start_time = 0.0
-        self.last_bc_time = 0.0
+        self.is_speaking: bool = False
+        self.speech_start_time: int = 0
+        self.silence_start_time: int = 0
+        self.last_bc_time: int = 0
 
         # Calculate how many chunks fit into 100ms (100ms / 32ms ≈ 3 chunks)
         buffer_len = max(1, int((self.pitch_window_ms / 1000.0) / (self.chunk_size / self.frame_rate)))
@@ -47,8 +52,108 @@ class RealtimeBackchanneler:
         self.pitch_valid_at_speech_end = False
         self.speech_duration_at_end = 0.0
 
+    def detect_pitch_variation(self, samples: bytearray) -> bool:
+        """
+        Detect wheter there is a pitch variation which is larger than the predefined threshold
+
+        Args:
+            audio_frame (AudioFrame): Current processed Audio Frame
+
+        Returns:
+            bool: True when a pitch rising or fall is detected which is higher than {self.pitch_shift_hz}
+        """
+
+        samples = np.frombuffer(samples, dtype= np.int16).astype(np.float32)
+
+        pitch = self.pitch_detector(samples)[0]
+
+        # Detect whether there was an actual pitch change (speech)
+        if pitch > 0:
+            # Add pitch value to buffer
+            self.pitch_buffer.append(pitch)
+
+        # Continuously evaluate if the current rolling 100ms window has a 30Hz drop/rise
+        current_pitch_shift = 0.0
+        if len(self.pitch_buffer) > 1:
+            current_pitch_shift = max(self.pitch_buffer) - min(self.pitch_buffer)
+
+        # Check if a pitch rising or fall is detected in the current window
+        return current_pitch_shift >= self.pitch_shift_hz
+
+    def set_talking(self, current_time: int) -> None:
+        """
+        Set current state to talking
+
+        Args:
+            current_time (int): Time at which function call is invoked
+        """
+        self.speech_start_time = current_time
+        self.is_speaking = True
+
+    def set_silence(self, current_time: int) -> None:
+        """
+        Set current state to silent
+
+        Args:
+            current_time (int): Time at which function call is invoked
+        """
+        self.silence_start_time = current_time
+        self.is_speaking = False
+
+    def get_latest_speech_time(self, current_time: int) -> int:
+        """
+        Retrieve the duration of speech going on before this function call
+
+        Args:
+            current_time (int): current ms of audioframe
+
+        Returns:
+            int: amount of ms of speech. If -1 currently silent
+        """
+
+        if self.is_speaking:
+            return current_time - self.speech_start_time
+
+        return -1
+
+    def get_latest_silence_time(self, current_time: int) -> int:
+        """
+        Retrieve the duration of silence going on before this function call
+
+        Args:
+            current_time (int): current ms of audioframe
+
+        Returns:
+            int: amount of ms of silence. If -1 currently talking
+        """
+
+        if not self.is_speaking:
+            return current_time - self.silence_start_time
+
+        return -1
+
+    def get_time_since_latest_bc(self, current_time: int) -> int:
+        """
+        Retrieve the time in ms since the latest backchannel was outputted
+
+        Args:
+            current_time (int): current time of invoking the function
+
+        Returns:
+            int: amount of ms since latest backchannel
+        """
+
+        return current_time - self.last_bc_time
+
+    def get_backchannel_class(self) -> BackchannelType:
+        """
+        Retrieve type of backchannel based on previous utterance
+
+        Returns:
+            BackchannelType: Type of backchannel, could be either ASSESSMENT or CONTINUER
+        """
+
     def process_frame(self, audio_frame: AudioFrame):
-        now = time.time()
 
         samples = audio_frame.get_buf()
         if not samples:
@@ -66,59 +171,20 @@ class RealtimeBackchanneler:
         # Calculate Volume (RMS)
         rms = float(np.sqrt(np.mean(samples_np ** 2)))
 
-        self.ten_env.log_debug(f"RMS: {rms:.4f}")
-
-        # Calculate Pitch
-        pitch = self.pitch_detector(samples_np)[0]
-        if pitch > 0: # 0 means unvoiced/no pitch detected
-            self.pitch_buffer.append(pitch)
-
-        # Continuously evaluate if the current rolling 100ms window has a 30Hz drop/rise (P3 & P4)
-        current_pitch_shift = 0.0
-        if len(self.pitch_buffer) > 1:
-            current_pitch_shift = max(self.pitch_buffer) - min(self.pitch_buffer)
-
-        # Check if a pitch rising or fall is detected in the current window
-        pitch_condition_met = current_pitch_shift >= self.pitch_shift_hz
+        pitch_condition_met = self.detect_pitch_variation(samples)
 
         if pitch_condition_met:
-            self.ten_env.log_debug(f"Pitch condition met! Shift: {current_pitch_shift:.2f} Hz")
 
-            self.ten_env.log_debug(f"RMS = {rms:.4f}, Speech Duration at End = {self.speech_duration_at_end:.2f} ms, Cooldown = {(now - self.last_bc_time)*1000:.2f} ms")
+            self.ten_env.log_debug(f"Pitch variation detected! Now detecting silence")
 
-        # Detect whether we are currently in speech or silence and update states accordingly
-        if rms > self.silence_threshold:
-            # STATE: SPEECH
-            if not self.is_speaking:
-                self.is_speaking = True
-                self.speech_start_time = now
+            talking_time = self.get_latest_speech_time(time.time_ns() // 1000)
 
-            # Keep updating our "end of speech" variables as long as they are talking
-            self.pitch_valid_at_speech_end = pitch_condition_met
-            self.speech_duration_at_end = (now - self.speech_start_time) * 1000
+            time_since_bc = self.get_time_since_latest_bc(time.time_ns() // 1000)
 
-        else:
-            # STATE: SILENCE
-            if self.is_speaking:
-                self.is_speaking = False
-                self.silence_start_time = now
-                self.pitch_buffer.clear() # Clear buffer so we don't bleed old pitches into next turn
+            if talking_time >= self.speech_req_ms and time_since_bc >= self.bc_cooldown_ms:
 
-            # Calculate durations in milliseconds
-            pause_duration_ms = (now - self.silence_start_time) * 1000
-            cooldown_ms = (now - self.last_bc_time) * 1000
+                self.ten_env.log_debug(f"Backchannel opportunity! now waiting 400 ms")
 
-            # --- Check all BC Triggers ---
-            p1 = pause_duration_ms >= self.pause_req_ms
-            p2 = self.speech_duration_at_end >= self.speech_req_ms
-            p3_p4 = self.pitch_valid_at_speech_end
-            p5 = cooldown_ms >= self.bc_cooldown_ms
-
-            if p1 and p2 and p3_p4 and p5:
-                self.ten_env.log_info(f"[{time.strftime('%X')}] BC OUTPUT DETECTED! --> (Hmm / Yeah)")
-
-                # Update last BC time (P5)
-                self.last_bc_time = now
-
-                # Reset the pitch latch to prevent repeating BCs during the same long pause
-                self.pitch_valid_at_speech_end = False
+                # Currently we are in a different state: backchannel opportunity -> which means that we need to wait 400ms
+                # So we need to wait 400ms after pich fall or rising and then detect whether not in talking stage.
+                # If not in talking stage we can output backchannel

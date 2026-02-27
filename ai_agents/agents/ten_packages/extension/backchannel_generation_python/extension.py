@@ -16,7 +16,7 @@ from ten_runtime import (
 )
 from .backchannel_detection import RealtimeBackchanneler
 from .config import BackchannelConfig
-
+import time
 
 class Extension(AsyncExtension):
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
@@ -49,6 +49,14 @@ class Extension(AsyncExtension):
         ten_env.log(LogLevel.DEBUG, "on_cmd name {}".format(cmd_name))
 
         # IMPLEMENT: process cmd
+
+        if cmd_name == "start_of_sentence":
+            # User started talking
+            self.backchannel_predictor.set_talking(time.time_ns() // 1000)
+
+        if cmd_name == "end_of_sentence":
+            # User stopped talking
+            self.backchannel_predictor.set_silence(time.time_ns() // 1000)
 
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         await ten_env.return_result(cmd_result)
