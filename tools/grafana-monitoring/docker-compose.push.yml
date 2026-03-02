@@ -42,9 +42,9 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: ten_otel_collector_push
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8889:8889"   # Prometheus exporter
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus exporter
     volumes:
       - ./configs/push/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -59,7 +59,7 @@ services:
     image: grafana/loki:latest
     container_name: ten_loki_push
     ports:
-      - "3100:3100"   # Loki HTTP
+      - "3100:3100" # Loki HTTP
     volumes:
       - loki_data:/loki
       - ./configs/push/loki-config.yml:/etc/loki/local-config.yaml
@@ -78,10 +78,10 @@ services:
       - ./configs/push/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
     networks:
       - monitoring
     depends_on:

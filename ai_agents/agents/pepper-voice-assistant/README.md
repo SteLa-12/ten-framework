@@ -166,15 +166,14 @@ The voice assistant is configured in `tenapp/property.json`:
 
 ### Configuration Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `AGORA_APP_ID` | string | - | Your Agora App ID (required) |
-| `AGORA_APP_CERTIFICATE` | string | - | Your Agora App Certificate (optional) |
-| `OPENAI_API_KEY` | string | - | OpenAI API key (required) |
-| `OPENAI_MODEL` | string | gpt-4o | OpenAI model name (optional) |
-| `OPENAI_PROXY_URL` | string | - | Proxy URL for OpenAI API (optional) |
-| `ELEVENLABS_TTS_KEY` | string | - | ElevenLabs API key (required) |
-
+| Parameter               | Type   | Default | Description                           |
+| ----------------------- | ------ | ------- | ------------------------------------- |
+| `AGORA_APP_ID`          | string | -       | Your Agora App ID (required)          |
+| `AGORA_APP_CERTIFICATE` | string | -       | Your Agora App Certificate (optional) |
+| `OPENAI_API_KEY`        | string | -       | OpenAI API key (required)             |
+| `OPENAI_MODEL`          | string | gpt-4o  | OpenAI model name (optional)          |
+| `OPENAI_PROXY_URL`      | string | -       | Proxy URL for OpenAI API (optional)   |
+| `ELEVENLABS_TTS_KEY`    | string | -       | ElevenLabs API key (required)         |
 
 ## Customization
 
@@ -211,22 +210,31 @@ docker run --rm -it --env-file .env -p 8080:8080 -p 3000:3000 pepper-voice-assis
 - [ElevenLabs API Documentation](https://docs.elevenlabs.io/)
 - [TEN Framework Documentation](https://doc.theten.ai)
 
+## Useful documents
+
+- [Setting up logging with Grafana and OTLP](../../../tools/grafana-monitoring/README.md)
+
 ## COMMON PROBLEMS
 
 1. **Installing MaAI fails**
-<br>
-MaAI needs PyAudio to be able to run, which runs on portaudio. This specific package needs to be installed separately, which can be done using the following command:
+   <br>
+   MaAI needs PyAudio to be able to run, which runs on portaudio. This specific package needs to be installed separately, which can be done using the following command:
+
 ```
 sudo apt-get install portaudio19-dev
 ```
+
 If this doesn't work, you should probably first update apt-get, which can be done using this command:
+
 ```
 sudo apt-get update
 ```
 
 2. **Problems with pydub**
-Install ffmpeg
+   Install ffmpeg
 
 3. **Problems with invalid logging configuration**
-Make sure to use tman version of at least 0.11.53 to be sure logging using grafana and otlp is supported. You can check your tman version using `tman --version` and update it using `pip install tman --upgrade` (don't know if this works, otherwise download from github release page and install inside /pepper-voice-assistant/ten_manager/bin).
-If it is not updated in the docker container, copy it to the correct path to us tman.
+   Make sure to use tman version of at least 0.11.53 to be sure logging using grafana and otlp is supported. You can check your tman version using `tman --version` and update it using `pip install tman --upgrade` (don't know if this works, otherwise download from github release page and install inside /pepper-voice-assistant/ten_manager/bin).
+   If it is not updated in the docker container, copy it to the correct path to use tman.
+
+   download tman inside `ai_agents`-folder and copy the tman file to the correct path in the docker container: `/usr/local/bin/tman` (you can use `docker cp` for this).

@@ -93,6 +93,11 @@
               "type": "extension",
               "name": "backchannel_generation",
               "addon": "backchannel_generation_python"
+            },
+            {
+              "type": "extension",
+              "name": "vad",
+              "addon": "ten_vad_python"
             }
           ],
           "connections": [
@@ -164,6 +169,38 @@
                     },
                     {
                       "extension": "backchannel_generation"
+                    },
+                    {
+                      "extension": "vad"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "vad",
+              "cmd": [
+                {
+                  "names": [
+                    "start_of_sentence",
+                    "end_of_sentence"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "backchannel_generation"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "stt",
+              "data": [
+                {
+                  "name": "asr_result",
+                  "dest": [
+                    {
+                      "extension": "backchannel_generation"
                     }
                   ]
                 }
@@ -187,21 +224,20 @@
           "emitter": {
             "type": "otlp",
             "config": {
-              "endpoint": "http://otel-collector:4317",
+              "endpoint": "http://host.docker.internal:4317",
               "protocol": "grpc",
-              "service_name": "ten-framework-app"
+              "service_name": "pepper-ten-app"
             }
           }
         },
         {
           "matchers": [
             {
-              "level": "warn"
+              "level": "info"
             }
           ],
           "formatter": {
-            "type": "plain",
-            "colored": true
+            "type": "plain"
           },
           "emitter": {
             "type": "console",
@@ -211,6 +247,22 @@
           }
         }
       ]
+    },
+    "services": {
+      "telemetry": {
+        "enabled": true,
+        "metrics": {
+          "enabled": true,
+          "exporter": {
+            "type": "otlp",
+            "config": {
+              "endpoint": "http://host.docker.internal:4317",
+              "protocol": "grpc",
+              "service_name": "pepper-ten-app"
+            }
+          }
+        }
+      }
     }
   }
 }

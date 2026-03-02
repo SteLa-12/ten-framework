@@ -50,6 +50,25 @@ build_go_app() {
   local app_dir=$1
   cd $app_dir
 
+  local runtime_lib_dir="$app_dir/ten_packages/system/ten_runtime/lib"
+  local runtime_so="$runtime_lib_dir/libten_runtime.so"
+  local utils_so="$runtime_lib_dir/libten_utils.so"
+
+  if [[ ! -f "$runtime_so" || ! -f "$utils_so" ]]; then
+    local fallback_lib_dir="$app_dir/../../ten_packages/system/ten_runtime/lib"
+
+    if [[ -f "$fallback_lib_dir/libten_runtime.so" && -f "$fallback_lib_dir/libten_utils.so" ]]; then
+      echo "ten_runtime shared libraries are missing in app package, copying from workspace package..."
+      mkdir -p "$runtime_lib_dir"
+      cp -f "$fallback_lib_dir/libten_runtime.so" "$fallback_lib_dir/libten_utils.so" "$runtime_lib_dir/"
+    else
+      echo "FATAL: missing ten_runtime shared libraries."
+      echo "       Expected: $runtime_so and $utils_so"
+      echo "       Fallback not found: $fallback_lib_dir"
+      exit 1
+    fi
+  fi
+
   go run "$app_dir/ten_packages/system/ten_runtime_go/tools/build/main.go" --verbose
   if [[ $? -ne 0 ]]; then
     echo "FATAL: failed to build go app, see logs for detail."

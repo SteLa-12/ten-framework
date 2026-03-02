@@ -71,7 +71,7 @@
     ],
     "data_in": [
       {
-        "name": "text_data"
+        "name": "asr_result"
       }
     ]
   },
