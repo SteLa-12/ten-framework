@@ -1,6 +1,5 @@
 import numpy as np
 from aubio import pitch
-import time
 from collections import deque
 import enum
 import wave
@@ -56,6 +55,7 @@ class RealtimeBackchanneler:
         self.backchannel_opportunity: bool = False
         self.time_since_bop: int = 0
         self.latest_bc_class: BackchannelType | None = None
+        self.speaking_change: bool = False
 
         # Calculate how many chunks fit into 100ms (100ms / 32ms ≈ 3 chunks)
         buffer_len = max(1, int((self.pitch_window_ms / 1000.0) / (self.chunk_size / self.frame_rate)))
@@ -67,6 +67,7 @@ class RealtimeBackchanneler:
 
         # Utterance buffer which gets filled as soon as results from the ASR module are available
         self.utterance_buffer: str = ""
+        self.backchannel_frames: list[AudioFrame] = []
 
         # Load backchannel prediction model and tokenizer
         # Load model and tokenizer from local folder
@@ -108,25 +109,25 @@ class RealtimeBackchanneler:
         # Check if a pitch rising or fall is detected in the current window
         return current_pitch_shift >= self.pitch_shift_hz
 
-    def set_talking(self, current_time: int) -> None:
+    def set_talking(self) -> None:
         """
         Set current state to talking
 
         Args:
             current_time (int): Time at which function call is invoked
         """
-        self.speech_start_time = current_time
         self.is_speaking = True
+        self.speaking_change = True
 
-    def set_silence(self, current_time: int) -> None:
+    def set_silence(self) -> None:
         """
         Set current state to silent
 
         Args:
             current_time (int): Time at which function call is invoked
         """
-        self.silence_start_time = current_time
         self.is_speaking = False
+        self.speaking_change = True
         self.flush_utterance_buffer()
 
     def get_latest_speech_time(self, current_time: int) -> int:
@@ -181,7 +182,7 @@ class RealtimeBackchanneler:
         Args:
             utterance (str): Small piece of text outputted by the user
         """
-        self.utterance_buffer += " " + utterance
+        self.utterance_buffer = utterance
         self.ten_env.log_debug(f"Updated utterance buffer: {self.utterance_buffer}")
 
     def flush_utterance_buffer(self) -> None:
@@ -191,7 +192,7 @@ class RealtimeBackchanneler:
 
         self.utterance_buffer = ""
 
-    def get_backchannel_class(self, utterance: str) -> tuple[BackchannelType, float]:
+    async def get_backchannel_class(self, utterance: str, timestamp: int) -> None:
         """
         Retrieve type of backchannel based on previous utterance
 
@@ -215,11 +216,11 @@ class RealtimeBackchanneler:
         pred_idx = int(torch.argmax(probs).item())
         id2label = self.model.config.id2label or {}
         predicted_label = id2label.get(str(pred_idx), id2label.get(pred_idx, f"LABEL_{pred_idx}"))
-        confidence = float(probs[pred_idx].item())
 
-        return BackchannelType(predicted_label), confidence
+        # Immediatly generate the correct frames
+        await self.create_backchannel(BackchannelType(predicted_label), timestamp)
 
-    async def send_backchannel(self, type: BackchannelType, timestamp: int) -> None:
+    async def create_backchannel(self, type: BackchannelType, timestamp: int) -> None:
         """
         Send a backchannel audio frame to the next extension in line
 
@@ -228,7 +229,7 @@ class RealtimeBackchanneler:
         """
         backchannel_audio_files = {BackchannelType.ASSESSMENT: ["i_see", "sure"], BackchannelType.CONTINUER: ["go_on", "mmhm", "right", "uhhuh", "yeah"]}
 
-        audio_file_dir = "ten_packages/extension/backchannel_generation_python/"
+        audio_file_dir = "ten_packages/extension/backchannel_generation_python/backchannel_audio_male/"
 
         backchannel_file = (
             audio_file_dir
@@ -264,7 +265,7 @@ class RealtimeBackchanneler:
             backchannel_frame.set_sample_rate(sample_rate)
             backchannel_frame.set_number_of_channels(channels)
             backchannel_frame.set_samples_per_channel(samples_per_frame)
-            backchannel_frame.set_timestamp(timestamp + frame_idx * frame_duration_ms * 1000)
+            backchannel_frame.set_timestamp(timestamp + frame_idx * frame_duration_ms)
             backchannel_frame.set_eof(False)
 
             # Fill with PCM data
@@ -273,23 +274,51 @@ class RealtimeBackchanneler:
             buf[:] = frame_data
             backchannel_frame.unlock_buf(buf)
 
-            # Send audio frame
-            self.ten_env.log_debug(f"Sending backchannel audio frame {frame_idx + 1}/{total_frames}")
-            await self.ten_env.send_audio_frame(backchannel_frame)
+            self.backchannel_frames.append(backchannel_frame)
 
-            # Wait for frame duration to enable real-time playback
-            await asyncio.sleep(frame_duration_ms / 1000.0)
+    async def send_backchannel(self) -> None:
+        """
+        Send the backchannel frames to the next extension in the graph
+        """
+
+        if not self.backchannel_frames:
+            return
+        for backchannel_frame in self.backchannel_frames:
+            await self.ten_env.send_audio_frame(backchannel_frame)
+        self.backchannel_frames.clear()
 
     async def process_frame(self, samples: bytearray, timestamp: int) -> None:
+        """
+        Process a specific audio frame and detect whether a backchannel should be outputted or not
 
-        if self.backchannel_opportunity and time.time_ns() // 1000 - self.time_since_bop > self.pause_req_ms and self.latest_bc_class is not None:
-            self.last_bc_time = time.time_ns() // 1000
+        Args:
+            samples (bytearray): The exact data of the current audio frame which should be processed
+            timestamp (int): time in ms at which the audio frame is in the current conversation
+        """
+
+        if not self.is_speaking:
+            return
+
+        if self.is_speaking and self.speaking_change:
+            self.speech_start_time = timestamp
+        elif self.speaking_change:
+            self.silence_start_time = timestamp
+        self.speaking_change = False
+
+        if self.backchannel_opportunity and timestamp - self.time_since_bop > self.pause_req_ms and self.latest_bc_class is not None:
+            self.last_bc_time = timestamp
+
+            self.ten_env.log_info(f"[Backchannel opportunity] Outputting backchannel of type {self.latest_bc_class} with utterance buffer: '{self.utterance_buffer}'")
+
             self.flush_utterance_buffer()
-
             # Run backchannel sending in another thread to avoid blocking the main thread with sending
             self.send_backchannel_task = asyncio.create_task(
-                self.send_backchannel(self.latest_bc_class, timestamp)
+                self.send_backchannel()
             )
+
+            # Set backchannel opportunity to false and reset latest bc class to avoid multiple backchannels in a row without new pitch variation or new utterance
+            self.backchannel_opportunity = False
+
             return
 
         pitch_condition_met = self.detect_pitch_variation(samples)
@@ -298,23 +327,29 @@ class RealtimeBackchanneler:
 
             self.ten_env.log_debug("Pitch variation detected! Now detecting silence")
 
-            talking_time = self.get_latest_speech_time(time.time_ns() // 1000)
+            talking_time = self.get_latest_speech_time(timestamp)
 
-            time_since_bc = self.get_time_since_latest_bc(time.time_ns() // 1000)
+            time_since_bc = self.get_time_since_latest_bc(timestamp)
 
             if talking_time >= self.speech_req_ms and time_since_bc >= self.bc_cooldown_ms:
 
-                self.ten_env.log_debug("Backchannel opportunity! now waiting 400 ms")
+                self.ten_env.log_debug("[Backchannel opportunity] now waiting 400 ms")
 
                 # Currently we are in a different state: backchannel opportunity -> which means that we need to wait 400ms
                 # So we need to wait 400ms after pich fall or rising and then detect whether not in talking stage.
                 # If not in talking stage we can output backchannel
 
-                self.time_since_bop = time.time_ns() // 1000
-                self.latest_bc_class, _ = await asyncio.to_thread(
-                    self.get_backchannel_class,
+                self.backchannel_opportunity = True
+
+                self.time_since_bop = timestamp
+                asyncio.create_task(
+                    self.get_backchannel_class(
                     self.utterance_buffer.strip(),
+                    timestamp + 400
+                    )
                 ) # change to self.utterance_buffer
+
+
 
     async def stop(self) -> None:
         if self.send_backchannel_task is not None:

@@ -20,7 +20,6 @@ from ten_runtime import (
 from .backchannel_detection import RealtimeBackchanneler
 from .backchannel_processor import BackchannelProcessor
 from .config import BackchannelConfig
-import time
 
 
 class Extension(AsyncExtension):
@@ -73,11 +72,11 @@ class Extension(AsyncExtension):
 
         if cmd_name == "start_of_sentence":
             # User started talking
-            self.backchannel_predictor.set_talking(time.time_ns() // 1000)
+            self.backchannel_predictor.set_talking()
 
         if cmd_name == "end_of_sentence":
             # User stopped talking
-            self.backchannel_predictor.set_silence(time.time_ns() // 1000)
+            self.backchannel_predictor.set_silence()
 
         cmd_result = CmdResult.create(StatusCode.OK, cmd)
         await ten_env.return_result(cmd_result)
@@ -87,6 +86,11 @@ class Extension(AsyncExtension):
         ten_env.log(LogLevel.DEBUG, "on_data name {}".format(data_name))
 
         # IMPLEMENT: process data
+
+        if data_name == 'asr_result':
+            utterance, error = data.get_property_string("text")
+            self.backchannel_predictor.add_to_utterance_buffer(utterance) if error is None else ten_env.log_debug(f"Error getting ASR result from data property: {error}")
+
 
     async def on_audio_frame(
         self, ten_env: AsyncTenEnv, audio_frame: AudioFrame

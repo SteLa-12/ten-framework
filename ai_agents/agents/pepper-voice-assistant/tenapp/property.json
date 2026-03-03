@@ -32,7 +32,8 @@
                 "params": {
                   "api_key": "${env:OPENAI_API_KEY}",
                   "input_audio_transcription": {
-                    "model": "gpt-4o-transcribe"
+                    "model": "gpt-4o-transcribe",
+                    "language": "en"
                   }
                 },
                 "dump": false,
@@ -202,6 +203,19 @@
                   "dest": [
                     {
                       "extension": "backchannel_generation"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "backchannel_generation",
+              "audio_frame": [
+                {
+                  "name": "pcm_frame",
+                  "dest": [
+                    {
+                      "extension": "agora_rtc"
                     }
                   ]
                 }
