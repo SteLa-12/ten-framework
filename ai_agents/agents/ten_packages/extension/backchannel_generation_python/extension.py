@@ -3,6 +3,9 @@
 # Licensed under the Apache License, Version 2.0.
 # See the LICENSE file for more information.
 #
+
+import asyncio
+
 from ten_runtime import (
     AudioFrame,
     VideoFrame,
@@ -15,15 +18,14 @@ from ten_runtime import (
     LogLevel,
 )
 from .backchannel_detection import RealtimeBackchanneler
+from .backchannel_processor import BackchannelProcessor
 from .config import BackchannelConfig
 import time
+
 
 class Extension(AsyncExtension):
     async def on_init(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_init")
-
-    async def on_start(self, ten_env: AsyncTenEnv) -> None:
-        ten_env.log(LogLevel.DEBUG, "on_start")
 
         config_json, _ = await ten_env.get_property_to_json("")
 
@@ -34,12 +36,31 @@ class Extension(AsyncExtension):
         )
 
         self.last_pitch_hz: float | None = None
+        self.main_runtime_task: asyncio.Task | None = None
         self.backchannel_predictor = RealtimeBackchanneler(ten_env, self.config.frame_rate, self.config.chunk_size, self.config.silence_threshold, self.config.pause_req_ms, self.config.speech_req_ms, self.config.pitch_window_ms, self.config.pitch_shift_hz, self.config.bc_cooldown_ms)
+        self.backchannel_processor = BackchannelProcessor(self.backchannel_predictor, ten_env)
+
+    async def on_start(self, ten_env: AsyncTenEnv) -> None:
+        ten_env.log(LogLevel.DEBUG, "on_start")
+
+        self.backchannel_processor.finish_event.clear()
+
+        self.main_runtime_task = asyncio.create_task(self.backchannel_processor.run())
+
 
     async def on_stop(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_stop")
 
-        # IMPLEMENT: clean up resources
+        await self.backchannel_processor.stop()
+        await self.backchannel_predictor.stop()
+
+        if self.main_runtime_task is not None:
+            self.main_runtime_task.cancel()
+            try:
+                await self.main_runtime_task
+            except asyncio.CancelledError:
+                pass
+            self.main_runtime_task = None
 
     async def on_deinit(self, ten_env: AsyncTenEnv) -> None:
         ten_env.log(LogLevel.DEBUG, "on_deinit")
@@ -80,9 +101,7 @@ class Extension(AsyncExtension):
             )
             return
 
-        samples = audio_frame.get_buf()
-
-        await self.backchannel_predictor.process_frame(samples)
+        await self.backchannel_processor.add_audio(audio_frame)
 
     async def on_video_frame(
         self, ten_env: AsyncTenEnv, video_frame: VideoFrame

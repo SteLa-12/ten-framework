@@ -19,7 +19,7 @@ processors:
     attributes:
       - key: service.name
         value: ten-framework
-        action: insert  # Only set if missing, preserve upstream service.name
+        action: insert # Only set if missing, preserve upstream service.name
       - key: deployment.mode
         value: push
         action: upsert
@@ -27,7 +27,7 @@ processors:
 exporters:
   # Export metrics to Prometheus (pull mode)
   prometheus:
-    endpoint: "0.0.0.0:8889"
+    endpoint: "0.0.0.0:9413"
     # namespace: ten  # Removed to keep metric names consistent with Pull Mode
     const_labels:
       exporter: otlp

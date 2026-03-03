@@ -1,20 +1,25 @@
 import numpy as np
-import aubio
+from aubio import pitch
 import time
 from collections import deque
 import enum
 import wave
 import asyncio
+import random
 
 from ten_runtime.async_ten_env import AsyncTenEnv
 
 from pathlib import Path
+from ten_runtime.audio_frame import AudioFrame
+from ten_runtime.audio_frame import AudioFrameDataFmt
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class BackchannelType(enum.Enum):
-    ASSESSMENT = 1
-    CONTINUER = 2
+    ASSESSMENT = "assessment"
+    CONTINUER = "continuer"
+
+
 
 class RealtimeBackchanneler:
     def __init__(self, ten_env: AsyncTenEnv,
@@ -39,7 +44,7 @@ class RealtimeBackchanneler:
         self.bc_cooldown_ms = bc_cooldown_ms
 
         # Initialize Real-time Pitch Tracker
-        self.pitch_detector = aubio.pitch("yin", 2048, chunk_size, frame_rate)
+        self.pitch_detector = pitch("yin", 2048, chunk_size, frame_rate)
         self.pitch_detector.set_unit("Hz")
         self.pitch_detector.set_silence(-40)
 
@@ -73,6 +78,7 @@ class RealtimeBackchanneler:
         self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(self.device)
         self.model.eval()
+        self.send_backchannel_task: asyncio.Task | None = None
 
     def detect_pitch_variation(self, samples: bytearray) -> bool:
         """
@@ -85,9 +91,9 @@ class RealtimeBackchanneler:
             bool: True when a pitch rising or fall is detected which is higher than {self.pitch_shift_hz}
         """
 
-        samples = np.frombuffer(samples, dtype= np.int16).astype(np.float32)
+        samples_np = np.frombuffer(samples, dtype=np.int16).astype(np.float32)
 
-        pitch = self.pitch_detector(samples)[0]
+        pitch = self.pitch_detector(samples_np)[0]
 
         # Detect whether there was an actual pitch change (speech)
         if pitch > 0:
@@ -213,7 +219,7 @@ class RealtimeBackchanneler:
 
         return BackchannelType(predicted_label), confidence
 
-    async def send_backchannel(self, type: BackchannelType) -> None:
+    async def send_backchannel(self, type: BackchannelType, timestamp: int) -> None:
         """
         Send a backchannel audio frame to the next extension in line
 
@@ -224,10 +230,24 @@ class RealtimeBackchanneler:
 
         audio_file_dir = "ten_packages/extension/backchannel_generation_python/"
 
-        backchannel_file = audio_file_dir + backchannel_audio_files[type][np.round(np.random.rand() * len(backchannel_audio_files[type]), dtype=int)] + ".wav"
+        backchannel_file = (
+            audio_file_dir
+            + random.choice(backchannel_audio_files[type])
+            + ".wav"
+        )
 
-        with wave.open(backchannel_file) as audio:
-            audio.read_frames()
+        with wave.open(backchannel_file, "rb") as audio:
+            sample_rate = audio.getframerate()
+            channels = audio.getnchannels()
+            bytes_per_sample = audio.getsampwidth()
+            raw_data = audio.readframes(audio.getnframes())
+
+        frame_duration_ms = 10
+        samples_per_frame = int(sample_rate * frame_duration_ms / 1000)
+        bytes_per_frame = samples_per_frame * bytes_per_sample * channels
+
+        if bytes_per_frame == 0:
+            return
 
         total_frames = len(raw_data) // bytes_per_frame
 
@@ -244,7 +264,7 @@ class RealtimeBackchanneler:
             backchannel_frame.set_sample_rate(sample_rate)
             backchannel_frame.set_number_of_channels(channels)
             backchannel_frame.set_samples_per_channel(samples_per_frame)
-            backchannel_frame.set_timestamp(frame_idx * frame_duration_ms * 1000)
+            backchannel_frame.set_timestamp(timestamp + frame_idx * frame_duration_ms * 1000)
             backchannel_frame.set_eof(False)
 
             # Fill with PCM data
@@ -260,14 +280,16 @@ class RealtimeBackchanneler:
             # Wait for frame duration to enable real-time playback
             await asyncio.sleep(frame_duration_ms / 1000.0)
 
-    async def process_frame(self, samples: bytearray) -> None:
+    async def process_frame(self, samples: bytearray, timestamp: int) -> None:
 
         if self.backchannel_opportunity and time.time_ns() // 1000 - self.time_since_bop > self.pause_req_ms and self.latest_bc_class is not None:
             self.last_bc_time = time.time_ns() // 1000
             self.flush_utterance_buffer()
 
             # Run backchannel sending in another thread to avoid blocking the main thread with sending
-            asyncio.create_task(self.send_backchannel(self.latest_bc_class))
+            self.send_backchannel_task = asyncio.create_task(
+                self.send_backchannel(self.latest_bc_class, timestamp)
+            )
             return
 
         pitch_condition_met = self.detect_pitch_variation(samples)
@@ -289,4 +311,16 @@ class RealtimeBackchanneler:
                 # If not in talking stage we can output backchannel
 
                 self.time_since_bop = time.time_ns() // 1000
-                self.latest_bc_class, _ = self.get_backchannel_class("This is a test") # change to self.utterance_buffer
+                self.latest_bc_class, _ = await asyncio.to_thread(
+                    self.get_backchannel_class,
+                    self.utterance_buffer.strip(),
+                ) # change to self.utterance_buffer
+
+    async def stop(self) -> None:
+        if self.send_backchannel_task is not None:
+            self.send_backchannel_task.cancel()
+            try:
+                await self.send_backchannel_task
+            except asyncio.CancelledError:
+                pass
+            self.send_backchannel_task = None

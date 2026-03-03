@@ -44,7 +44,7 @@ services:
     ports:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
-      - "8889:8889" # Prometheus exporter
+      - "9413:9413" # Prometheus exporter
     volumes:
       - ./configs/push/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
