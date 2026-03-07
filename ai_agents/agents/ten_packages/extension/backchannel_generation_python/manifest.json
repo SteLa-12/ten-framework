@@ -49,7 +49,35 @@
   },
   "api": {
     "property": {
-      "properties": {}
+      "properties": {
+        "pitch_fall_threshold_hz": {
+          "type": "float32"
+        },
+        "frame_rate": {
+          "type": "int64"
+        },
+        "chunk_size": {
+          "type": "int64"
+        },
+        "silence_threshold": {
+          "type": "float32"
+        },
+        "pause_req_ms": {
+          "type": "int64"
+        },
+        "speech_req_ms": {
+          "type": "int64"
+        },
+        "pitch_window_ms": {
+          "type": "int64"
+        },
+        "pitch_shift_hz": {
+          "type": "float32"
+        },
+        "bc_cooldown_ms": {
+          "type": "int64"
+        }
+      }
     },
     "audio_frame_in": [
       {

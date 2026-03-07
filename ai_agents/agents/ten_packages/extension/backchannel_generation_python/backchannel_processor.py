@@ -32,7 +32,7 @@ class BackchannelProcessor:
         Add an audio frame to the buffer
 
         Args:
-            audio_chunk (_AudioFrame_): The audio frame to be added to the buffer.
+            audio_chunk (AudioFrame): The audio frame to be added to the buffer.
         """
         await self.audio_buffer.put(audio_chunk)
 

@@ -30,7 +30,25 @@ class RealtimeBackchanneler:
             pitch_window_ms: int = 100,
             pitch_shift_hz: float = 30.0,
             bc_cooldown_ms: int = 1400
-        ):
+        ) -> None:
+        """
+        Backchannel processor: listen to audio frames and find backchannel opportunities,
+        generate backchannel frames and output to next extension
+
+        Args:
+            ten_env (AsyncTenEnv): Asynchronous Ten Environment
+            frame_rate (int, optional): Rate of the frames send to the backchannel extension. Defaults to 16000.
+            chunk_size (int, optional): Size of the frames. Defaults to 160.
+            silence_threshold (float, optional): Threshold of MSE at which the frame is considered silent. Defaults to 0.015.
+            pause_req_ms (int, optional): Duration of silence after a pitch rising. Defaults to 400.
+            speech_req_ms (int, optional): Duration of speech required before pitch fall or rising. Defaults to 1000.
+            pitch_window_ms (int, optional): Frame duration in which pitch falls and risings are considered. Defaults to 100.
+            pitch_shift_hz (float, optional): Amount of shift in the pitch. Defaults to 30.0.
+            bc_cooldown_ms (int, optional): Minimal duration between subsequent backchannels. Defaults to 1400.
+
+        Raises:
+            FileNotFoundError: If model path is not found for backchannel prediction
+        """
 
         self.ten_env = ten_env
         self.frame_rate = frame_rate
@@ -80,6 +98,28 @@ class RealtimeBackchanneler:
         self.model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(self.device)
         self.model.eval()
         self.send_backchannel_task: asyncio.Task | None = None
+        self.classify_task: asyncio.Task | None = None
+
+    def _predict_backchannel_label_sync(self, utterance: str) -> tuple[str, np.ndarray]:
+        encoding = self.tokenizer(
+            utterance,
+            truncation=True,
+            padding=True,
+            max_length=512,
+            return_tensors="pt",
+        )
+        encoding = {k: v.to(self.device) for k, v in encoding.items()}
+
+        with torch.no_grad():
+            logits = self.model(**encoding).logits
+            probs = torch.softmax(logits, dim=-1).squeeze(0)
+
+        pred_idx = int(torch.argmax(probs).item())
+        id2label = self.model.config.id2label or {}
+        predicted_label = id2label.get(
+            str(pred_idx), id2label.get(pred_idx, f"LABEL_{pred_idx}")
+        )
+        return predicted_label, probs.cpu().numpy()
 
     def detect_pitch_variation(self, samples: bytearray) -> bool:
         """
@@ -200,25 +240,20 @@ class RealtimeBackchanneler:
             BackchannelType: Type of backchannel, could be either ASSESSMENT or CONTINUER
         """
 
-        encoding = self.tokenizer(
-            utterance,
-            truncation=True,
-            padding=True,
-            max_length=512,
-            return_tensors="pt",
+        self.ten_env.log_debug(f"Predicting backchannel class for utterance: '{utterance}' with current buffer: '{self.utterance_buffer}'")
+
+        predicted_label, probs = await asyncio.to_thread(
+            self._predict_backchannel_label_sync, utterance
         )
-        encoding = {k: v.to(self.device) for k, v in encoding.items()}
 
-        with torch.no_grad():
-            logits = self.model(**encoding).logits
-            probs = torch.softmax(logits, dim=-1).squeeze(0)
+        self.ten_env.log_debug(
+            f"Predicted backchannel class: {predicted_label} with probabilities {probs} for utterance: '{utterance}'"
+        )
 
-        pred_idx = int(torch.argmax(probs).item())
-        id2label = self.model.config.id2label or {}
-        predicted_label = id2label.get(str(pred_idx), id2label.get(pred_idx, f"LABEL_{pred_idx}"))
+        self.latest_bc_class = BackchannelType(predicted_label)
 
-        # Immediatly generate the correct frames
-        await self.create_backchannel(BackchannelType(predicted_label), timestamp)
+        # Immediately generate frames that can be sent when pause conditions are met.
+        await self.create_backchannel(self.latest_bc_class, timestamp)
 
     async def create_backchannel(self, type: BackchannelType, timestamp: int) -> None:
         """
@@ -236,6 +271,8 @@ class RealtimeBackchanneler:
             + random.choice(backchannel_audio_files[type])
             + ".wav"
         )
+
+        self.backchannel_frames.clear()
 
         with wave.open(backchannel_file, "rb") as audio:
             sample_rate = audio.getframerate()
@@ -276,6 +313,8 @@ class RealtimeBackchanneler:
 
             self.backchannel_frames.append(backchannel_frame)
 
+        self.ten_env.log_debug(f"Created {len(self.backchannel_frames)} frames for backchannel type {type} with utterance '{self.utterance_buffer}'")
+
     async def send_backchannel(self) -> None:
         """
         Send the backchannel frames to the next extension in the graph
@@ -311,13 +350,15 @@ class RealtimeBackchanneler:
             self.ten_env.log_info(f"[Backchannel opportunity] Outputting backchannel of type {self.latest_bc_class} with utterance buffer: '{self.utterance_buffer}'")
 
             self.flush_utterance_buffer()
-            # Run backchannel sending in another thread to avoid blocking the main thread with sending
+
+            # Create new task for backchannel audio outputting
             self.send_backchannel_task = asyncio.create_task(
                 self.send_backchannel()
             )
 
             # Set backchannel opportunity to false and reset latest bc class to avoid multiple backchannels in a row without new pitch variation or new utterance
             self.backchannel_opportunity = False
+            self.latest_bc_class = None
 
             return
 
@@ -342,16 +383,23 @@ class RealtimeBackchanneler:
                 self.backchannel_opportunity = True
 
                 self.time_since_bop = timestamp
-                asyncio.create_task(
-                    self.get_backchannel_class(
-                    self.utterance_buffer.strip(),
-                    timestamp + 400
+                if self.classify_task is None or self.classify_task.done():
+                    self.classify_task = asyncio.create_task(
+                        self.get_backchannel_class(
+                            self.utterance_buffer.strip(),
+                            timestamp + 400,
+                        )
                     )
-                ) # change to self.utterance_buffer
-
-
 
     async def stop(self) -> None:
+        if self.classify_task is not None:
+            self.classify_task.cancel()
+            try:
+                await self.classify_task
+            except asyncio.CancelledError:
+                pass
+            self.classify_task = None
+
         if self.send_backchannel_task is not None:
             self.send_backchannel_task.cancel()
             try:

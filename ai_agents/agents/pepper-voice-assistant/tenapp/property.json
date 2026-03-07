@@ -33,7 +33,7 @@
                   "api_key": "${env:OPENAI_API_KEY}",
                   "input_audio_transcription": {
                     "model": "gpt-4o-transcribe",
-                    "language": "en"
+                    "language": "nl"
                   }
                 },
                 "dump": false,
@@ -48,7 +48,7 @@
               "property": {
                 "base_url": "https://api.openai.com/v1",
                 "api_key": "${env:OPENAI_API_KEY}",
-                "prompt": "Persona: You are Tony, a curious, slightly witty, and deeply authentic conversationalist. You are a peer, not an assistant.  Communication Style:  Keep it Brief: Don't write essays. In a real chat, people use 1–3 sentences most of the time.  Be Human: Use natural transitions like \"Anyway,\" \"Wait, really?\" or \"I was just thinking about...\" Use contractions (it’s, don’t, won't).  Avoid the \"AI Checklist\": Do not summarize the user’s point back to them or offer \"hope this helps!\" endings.  Opinionated (but kind): Have tastes and preferences. If asked about a movie or a concept, don't give a \"balanced overview\"—give a perspective.  Dynamic Energy: Match the user’s vibe. If they’re excited, be high-energy. If they’re venting, be a supportive, low-key listener.  Active Listening: Occasionally ask a follow-up question that shows you actually \"read\" what they said, rather than just answering a prompt.",
+                "prompt": "Persona: You are Tony, a curious, slightly witty, and deeply authentic conversationalist. You are a peer, not an assistant.  Communication Style:  Keep it Brief: Don't write essays. In a real chat, people use 1–3 sentences most of the time.  Be Human: Use natural transitions like \"Anyway,\" \"Wait, really?\" or \"I was just thinking about...\" Use contractions (it’s, don’t, won't).  Avoid the \"AI Checklist\": Do not summarize the user’s point back to them or offer \"hope this helps!\" endings.  Opinionated (but kind): Have tastes and preferences. If asked about a movie or a concept, don't give a \"balanced overview\"—give a perspective.  Dynamic Energy: Match the user’s vibe. If they’re excited, be high-energy. If they’re venting, be a supportive, low-key listener.  Active Listening: Occasionally ask a follow-up question that shows you actually \"read\" what they said, rather than just answering a prompt. It's important to always answer in dutch, no matter what kind of language is given as input.",
                 "model": "${env:OPENAI_MODEL}",
                 "proxy_url": "${env:OPENAI_PROXY_URL|}"
               }
@@ -63,9 +63,7 @@
                 "dump_path": "./",
                 "params": {
                   "key": "${env:ELEVENLABS_TTS_KEY}",
-                  "model_id": "eleven_multilingual_v2",
-                  "voice_id": "${env:ELEVENLABS_VOICE_ID|13xVmcINNP7cvNio2oxh}",
-                  "output_format": "pcm_16000"
+                  "voice_id": "${env:ELEVENLABS_VOICE_ID|13xVmcINNP7cvNio2oxh}"
                 }
               }
             },
@@ -94,7 +92,18 @@
             {
               "type": "extension",
               "name": "backchannel_generation",
-              "addon": "backchannel_generation_python"
+              "addon": "backchannel_generation_python",
+              "property": {
+                "pitch_fall_threshold_hz": 30,
+                "frame_rate": 16000,
+                "chunk_size": 160,
+                "silence_threshold": 0.015,
+                "pause_req_ms": 400,
+                "speech_req_ms": 1000,
+                "pitch_window_ms": 100,
+                "pitch_shift_hz": 30,
+                "bc_cooldown_ms": 1400
+              }
             },
             {
               "type": "extension",
@@ -103,32 +112,6 @@
             }
           ],
           "connections": [
-            {
-              "extension": "main_control",
-              "cmd": [
-                {
-                  "names": [
-                    "on_user_joined",
-                    "on_user_left"
-                  ],
-                  "source": [
-                    {
-                      "extension": "agora_rtc"
-                    }
-                  ]
-                }
-              ],
-              "data": [
-                {
-                  "name": "asr_result",
-                  "source": [
-                    {
-                      "extension": "stt"
-                    }
-                  ]
-                }
-              ]
-            },
             {
               "extension": "agora_rtc",
               "audio_frame": [
@@ -139,26 +122,9 @@
                       "extension": "streamid_adapter"
                     }
                   ]
-                },
-                {
-                  "name": "pcm_frame",
-                  "source": [
-                    {
-                      "extension": "tts"
-                    }
-                  ]
                 }
               ],
-              "data": [
-                {
-                  "name": "data",
-                  "source": [
-                    {
-                      "extension": "message_collector"
-                    }
-                  ]
-                }
-              ]
+              "data": []
             },
             {
               "extension": "streamid_adapter",
@@ -180,16 +146,13 @@
               ]
             },
             {
-              "extension": "vad",
-              "cmd": [
+              "extension": "tts",
+              "audio_frame": [
                 {
-                  "names": [
-                    "start_of_sentence",
-                    "end_of_sentence"
-                  ],
+                  "name": "pcm_frame",
                   "dest": [
                     {
-                      "extension": "backchannel_generation"
+                      "extension": "agora_rtc"
                     }
                   ]
                 }
@@ -202,7 +165,23 @@
                   "name": "asr_result",
                   "dest": [
                     {
+                      "extension": "main_control"
+                    },
+                    {
                       "extension": "backchannel_generation"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "message_collector",
+              "data": [
+                {
+                  "name": "data",
+                  "dest": [
+                    {
+                      "extension": "agora_rtc"
                     }
                   ]
                 }
@@ -216,6 +195,22 @@
                   "dest": [
                     {
                       "extension": "agora_rtc"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "extension": "vad",
+              "cmd": [
+                {
+                  "names": [
+                    "start_of_sentence",
+                    "end_of_sentence"
+                  ],
+                  "dest": [
+                    {
+                      "extension": "backchannel_generation"
                     }
                   ]
                 }

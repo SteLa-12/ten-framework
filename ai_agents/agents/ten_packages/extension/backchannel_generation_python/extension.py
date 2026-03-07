@@ -44,6 +44,7 @@ class Extension(AsyncExtension):
 
         self.backchannel_processor.finish_event.clear()
 
+        # Keep the frame processor in the background so on_start can return quickly.
         self.main_runtime_task = asyncio.create_task(self.backchannel_processor.run())
 
 
