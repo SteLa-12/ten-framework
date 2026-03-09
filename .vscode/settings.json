@@ -13,7 +13,7 @@
     "editor.wordWrapColumn": 80
   },
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "charliermarsh.ruff"
   },
   "biome.configurationPath": "biome.json",
   "biome.enabled": true,

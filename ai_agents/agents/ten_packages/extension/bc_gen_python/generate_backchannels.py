@@ -1,63 +1,84 @@
 import os
-from openai import OpenAI
-import dotenv
+import re
+import wave
+from pathlib import Path
 
-dotenv.load_dotenv('../../../../.env')
+from dotenv import load_dotenv
+from elevenlabs.client import ElevenLabs
 
 
-# Initialize the OpenAI client
-# Ensure your OPENAI_API_KEY is set in your environment variables
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _load_env() -> None:
+    # Resolve .env relative to this file so execution cwd does not matter.
+    env_path = Path(__file__).resolve().parents[4] / ".env"
+    load_dotenv(env_path)
 
-def generate_backchannels():
-    # 1. Define your backchannels
-    # Note: Punctuation heavily influences intonation. 
-    # "Mm-hm." sounds like agreement. "Mm-hm?" sounds like a question.
+
+def _slugify_filename(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", text.lower())
+    return slug.strip("_")
+
+
+def generate_backchannels() -> None:
+    _load_env()
+
+    api_key = os.getenv("ELEVENLABS_API_KEY") or os.getenv("ELEVENLABS_TTS_KEY")
+    if not api_key:
+        raise RuntimeError("Missing ELEVENLABS_API_KEY (or ELEVENLABS_TTS_KEY) in environment")
+
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "13xVmcINNP7cvNio2oxh")
+    model_id = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+
     backchannels = [
         "Mm-hm.",
-        "Yeah.",
-        "Right.",
-        "I see.",
+        "Ja.",
+        "Juist.",
+        "Oke.",
         "Uh-huh.",
-        "Go on.",
-        "Sure."
+        "Ga verder.",
+        "Zeker.",
+        "Precies.",
+        "Inderdaad.",
+        "Ik snap het.",
     ]
 
-    # 2. Settings
-    output_folder = "backchannel_audio_male"
-    voice_actor = "alloy" # Options: alloy, echo, fable, onyx, nova, shimmer
-    model_version = "tts-1" # tts-1 is faster/snappier than tts-1-hd
+    output_folder = Path(__file__).resolve().parent / "backchannel_audio_male"
+    output_folder.mkdir(parents=True, exist_ok=True)
 
-    # Create output directory if it doesn't exist
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-        print(f"Created folder: {output_folder}")
+    client = ElevenLabs(api_key=api_key)
 
-    print(f"Generating {len(backchannels)} files using voice '{voice_actor}'...")
+    print(
+        f"Generating {len(backchannels)} files with ElevenLabs voice_id='{voice_id}', model_id='{model_id}'"
+    )
 
-    # 3. Loop through list and generate audio
     for text in backchannels:
+        filename = f"{_slugify_filename(text)}.wav"
+        file_path = output_folder / filename
+        print(f"Generating: '{text}' -> {file_path}")
+
         try:
-            # Create a clean filename (remove punctuation for the file system)
-            filename = text.replace(".", "").replace("-", "").replace(" ", "_").lower()
-            file_path = os.path.join(output_folder, f"{filename}.wav")
-
-            print(f"Generating: '{text}' -> {file_path}")
-
-            response = client.audio.speech.create(
-                model=model_version,
-                voice=voice_actor,
-                input=text,
-                response_format="wav"  # Explicitly requesting WAV format
+            audio_stream = client.text_to_speech.convert(
+                voice_id=voice_id,
+                model_id=model_id,
+                text=text,
+                output_format="pcm_16000",
             )
 
-            # Stream the response to a file
-            response.stream_to_file(file_path)
+            pcm_data = bytearray()
+            for chunk in audio_stream:
+                if chunk:
+                    pcm_data.extend(chunk)
 
-        except Exception as e:
-            print(f"Error generating '{text}': {e}")
+            # ElevenLabs returns raw PCM for pcm_16000. Wrap it as mono 16-bit WAV.
+            with wave.open(str(file_path), "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(16000)
+                wav_file.writeframes(bytes(pcm_data))
+        except Exception as exc:
+            print(f"Error generating '{text}': {exc}")
 
     print("\nDone! All files generated.")
+
 
 if __name__ == "__main__":
     generate_backchannels()

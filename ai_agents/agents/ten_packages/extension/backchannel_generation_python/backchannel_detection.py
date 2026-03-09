@@ -262,7 +262,7 @@ class RealtimeBackchanneler:
         Args:
             type (BackchannelType): Exact backchannel type needed to decide which backchannel should be outputted.
         """
-        backchannel_audio_files = {BackchannelType.ASSESSMENT: ["i_see", "sure"], BackchannelType.CONTINUER: ["go_on", "mmhm", "right", "uhhuh", "yeah"]}
+        backchannel_audio_files = {BackchannelType.ASSESSMENT: ["ga_verder", "ik_snap_het", "inderdaad", "juist", "precies"], BackchannelType.CONTINUER: ["ja", "mm_hm", "oke", "uh_huh", "zeker"]}
 
         audio_file_dir = "ten_packages/extension/backchannel_generation_python/backchannel_audio_male/"
 
